@@ -130,6 +130,23 @@ where
         }
         res
     }
+    fn slow_equivalence_intersection(a: &Self, b: &Self) -> Self {
+        // TODO: discover a better than O(n^2) algorithm for this.
+        assert!(a.leaders.len() == b.leaders.len(), "Called equivalence_union on two UF of different sizes");
+        let len = a.leaders.len();
+        let max_i = I::from_usize(len).unwrap();
+        let mut res = Self::new_reflexive(max_i);
+        for i_idx in 0..len {
+            let i = I::from_usize(i_idx).unwrap();
+            for j_idx in i_idx+1..len {
+                let j = I::from_usize(j_idx).unwrap();
+                if a.same_set(i,j) && b.same_set(i,j) {
+                    res.union(i,j);
+                }
+            }
+        }
+        res
+    }
     pub fn equivalence_intersection(a: &Self, b: &Self) -> Self {
         // TODO: discover a better than O(n^2) algorithm for this.
         assert!(a.leaders.len() == b.leaders.len(), "Called equivalence_union on two UF of different sizes");
@@ -192,7 +209,7 @@ where
     #[cfg(test)]
     /// Manually initialize a UF
     ///
-    /// Unsafe because it might violate invariants
+    /// Unsafe because reslulting UF might violate invariants
     unsafe fn from_slice(slice: &[I]) -> Self {
         let leaders = slice
             .iter()
@@ -252,8 +269,10 @@ mod tests {
         assert_is_residue_class(2, &x2);
         let x3 = residue_class(100, 3);
         assert_is_residue_class(3, &x3);
-        let y6 = UF::equivalence_intersection(&x2, &x3);
-        assert_is_residue_class(6, &y6);
+        let y6a = UF::slow_equivalence_intersection(&x2, &x3);
+        assert_is_residue_class(6, &y6a);
+        let y6b = UF::equivalence_intersection(&x2, &x3);
+        assert_is_residue_class(6, &y6b);
     }
 
 
