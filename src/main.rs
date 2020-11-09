@@ -148,21 +148,44 @@ where
         res
     }
     pub fn equivalence_intersection(a: &Self, b: &Self) -> Self {
-        // TODO: discover a better than O(n^2) algorithm for this.
         assert!(a.leaders.len() == b.leaders.len(), "Called equivalence_union on two UF of different sizes");
-        let len = a.leaders.len();
-        let max_i = I::from_usize(len).unwrap();
-        let mut res = Self::new_reflexive(max_i);
-        for i_idx in 0..len {
-            let i = I::from_usize(i_idx).unwrap();
-            for j_idx in i_idx+1..len {
-                let j = I::from_usize(j_idx).unwrap();
-                if a.same_set(i,j) && b.same_set(i,j) {
-                    res.union(i,j);
+        let ap = a.as_permutation();
+        let bp = b.as_permutation();
+        let mut c = UF::new_reflexive(a.max());
+        for i in (0..ap.len()).rev() {
+            let mut ai = i;
+            let mut bi = i;
+            let mut anext = ap[ai].into();
+            let mut bnext = bp[bi].into();
+            // Follow both cycles down until we find one in common or run out of elements
+            loop {
+                // while a is bigger than b, advance a
+                while anext < ai && anext > bnext {
+                    ai = anext;
+                    anext = ap[ai].into();
+                }
+                // if we're ad the end of the cycle, we're done
+                // if a and b are equal, we're done
+                if anext >= ai || anext == bnext {
+                    break;
+                }
+                // while b is bigger than a, advance b
+                while bnext < bi && bnext > anext {
+                    bi = bnext;
+                    bnext = bp[bi].into();
+                }
+                // if we're ad the end of the cycle, we're done
+                // if a and b are equal, we're done
+                if bnext >= bi || anext == bnext {
+                    break;
                 }
             }
+            if anext == bnext {
+                // anext is the biggest element in both the a and b cycle.
+                c.union(I::from_usize(i).unwrap(), I::from_usize(anext).unwrap());
+            }
         }
-        res
+        c
     }
 
     /// Ensure all leader paths are minimal
@@ -250,7 +273,7 @@ mod tests {
             let j = i - m;
             res.union(i,j);
         }
-        println!("residue_class({},{}) = {:?}", len, m, res);
+        //println!("residue_class({},{}) = {:?}", len, m, res);
         res
     }
     fn assert_is_residue_class(m: T, a: &UF<T>) {
@@ -265,13 +288,22 @@ mod tests {
     }
     #[test]
     fn try_2_3_6() {
-        let x2 = residue_class(100, 2);
+        let size = 10000;
+        println!("making x2");
+        let x2 = residue_class(size, 2);
+        println!("checking x2");
         assert_is_residue_class(2, &x2);
-        let x3 = residue_class(100, 3);
+        println!("making x3");
+        let x3 = residue_class(size, 3);
+        println!("testing x3");
         assert_is_residue_class(3, &x3);
+        println!("slowly making y6a");
         let y6a = UF::slow_equivalence_intersection(&x2, &x3);
+        println!("testing y6a");
         assert_is_residue_class(6, &y6a);
+        println!("quickly making y6b");
         let y6b = UF::equivalence_intersection(&x2, &x3);
+        println!("testing y6b");
         assert_is_residue_class(6, &y6b);
     }
 
