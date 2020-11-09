@@ -1,15 +1,12 @@
-// TODO: Come up with a reasonable policy about &mut.
-//       Is the internal mutability hazardous?  Not using const fn's/
-//       &mut is irritating, but informative about caching behavior of struct.
-#![allow(dead_code)]
 
+//! A basic implementation of the Union-find algorithm
 use num;
 use std::cell::Cell;
 
 #[derive(Clone, Debug)]
-/// Implements union-find with internal mutability
+/// Implements union-find
 ///
-/// The `find` method 
+/// The UF structure efficiently represents a disjoint set data structure.
 struct UF<I: Copy> {
     /// invariants: 
     ///     1.  leaders[i] <= i, so whenever unioning two indices, the bigger will point to the
@@ -45,6 +42,9 @@ impl<I> UF<I>
 where
     I: Into<usize> + Copy + num::FromPrimitive + num::Num + num::Integer,
 {
+    /// Creates a minimal reflexive UF structure.
+    ///
+    /// Each index `i` is the sole memeber of its own equivalence set.
     pub fn new_reflexive(size: I) -> Self {
         let mut leaders: Vec<Cell<I>> = Vec::with_capacity(size.into());
         for i in 0..size.into() {
@@ -52,9 +52,11 @@ where
         }
         UF { leaders }
     }
+    /// Returns the element beyond the largest represented in ths `UF`.
     pub fn max(&self) -> I {
         I::from_usize(self.leaders.len()).unwrap()
     }
+    /// Number of indices in this `UF`
     pub fn len(&self) -> usize {
         self.leaders.len()
     }
@@ -67,11 +69,16 @@ where
             i = l;
         }
     }
-    /// Returns representative with minimum index from equivalence class.
+    /// Returns representative with minimum index from `i`'s equivalence set.
     ///
     /// This method purports to immutably use `&self`, but it really uses interior mutability to
     /// implement path-compression in the safe, traditional way.  Almost every other method on `UF`
     /// delegates to `find`, so they are all lying too.
+    ///
+    /// # Performance
+    ///
+    /// If you perform `n` `find()` operations on a `UF` with length `len()`, then these operations
+    /// will take O(`n` + `len()`) operations.
     pub fn find(&self, i: I) -> I {
         let cell = &self.leaders[i.into()];
         let l = cell.get();
@@ -102,11 +109,11 @@ where
         }
     }
 
-    /// Perform union
+    /// Perform union of two indices
     ///
-    /// Since this structure uses interior mutability, the `mut` attribute is not strictly
-    /// necessary.  But it communicates to the user that the data structure is logically changing,
-    /// so it's a worthwhiile part of the API.
+    /// Since `UF` uses interior mutability, the `mut` attribute here is not strictly necessary.
+    /// But it communicates to the user that the data structure is logically changing, so it's a
+    /// worthwhiile part of the API.
     pub fn union(&mut self, i: I, j: I) {
         // The mutability here is really not necessary, but I think it is effective at
         // astonishment reduction.
@@ -118,9 +125,16 @@ where
             self.leaders[l_i.into()].set(l_j);
         }
     }
+    /// Retrns true if `i` and `j` are in the same equivalence set.
     pub fn same_set(&self, i: I, j: I) -> bool {
         self.find(i) == self.find(j)
     }
+    /// Creates a new UF that represents the union of the two given equivalence relations.
+    ///
+    /// let `c = UF::equivalence_union(&a, &b)`.  `c.same_set(i,j) == a.same_set(i,j) ||
+    /// b.same_set(i,j)`.
+    ///
+    /// Performance: O(len())
     pub fn equivalence_union(a: &Self, b: &Self) -> Self {
         assert!(a.leaders.len() == b.leaders.len(), "Called equivalence_union on two UF of different sizes");
         let mut res = a.clone();
@@ -147,6 +161,18 @@ where
         }
         res
     }
+    /// Creates a new UF that represents the intersection of the two given equivalence relations.
+    ///
+    /// let `c = UF::equivalence_intersection(&a, &b)`.  `c.same_set(i,j) == a.same_set(i,j) &&
+    /// b.same_set(i,j)`.
+    ///
+    /// # Performance
+    ///
+    /// I have only been able to prove that the performance is somewhere between O(`len()`) and
+    /// O(`len()`^2).
+    /// 
+    /// If either `a` or `b` is mostly pure-reflexive or mostly one big equivalence set, then the
+    /// performance is almost linear.
     pub fn equivalence_intersection(a: &Self, b: &Self) -> Self {
         assert!(a.leaders.len() == b.leaders.len(), "Called equivalence_union on two UF of different sizes");
         let ap = a.as_permutation();
@@ -197,9 +223,11 @@ where
     }
     /// Creates permutation version of a UF
     ///
-    /// each equivalence group corresponds to a cycle.  Every link in a cycle points downward,
+    /// Each equivalence set corresponds to a cycle.  Every link in a cycle points downward,
     /// except for the smallest which points at the largest element in the cycle.
-    fn as_permutation(&self) -> Vec<I> {
+    ///
+    /// This representation can be used to do neat algorithmic things with an equivalence class.
+    pub fn as_permutation(&self) -> Vec<I> {
         let mut res = Vec::with_capacity(self.leaders.len().into());
         for idx in 0..self.len() {
             let i = I::from_usize(idx).unwrap();
@@ -208,12 +236,11 @@ where
                 res.push(j); // identity cycle
             } else { // points to the leader
                 res.push(res[j.into()]); // This cell points back at the previous max
-                res[j.into()] = i;  // leader now points at this one, the new max
+                res[j.into()] = i;       // leader now points at this one, the new max
             }
         }
         res
     }
-    #[cfg(test)]
     /// Ensures all expected invariants hold
     ///
     /// The only one I can think of is that leaders[i] <= i
@@ -229,10 +256,11 @@ where
         }
     }
 
-    #[cfg(test)]
     /// Manually initialize a UF
     ///
     /// Unsafe because reslulting UF might violate invariants
+    ///
+    /// This is useful for testing.
     unsafe fn from_slice(slice: &[I]) -> Self {
         let leaders = slice
             .iter()
@@ -242,7 +270,6 @@ where
         UF { leaders }
     }
 
-    #[cfg(test)]
     /// compare two UF for structual equality, not logical equality
     ///
     /// Not actually unsafe, but requires understanding of internals to use properly, so it's
@@ -255,16 +282,16 @@ where
 }
 
 
-
-fn main() {
-    println!("Hello, world!");
-}
-
 #[cfg(test)]
 mod tests {
     type T = u16;
     use super::UF;
     use num::FromPrimitive;
+    use rand::prelude::*;
+
+    fn test_rng() -> StdRng {
+        StdRng::seed_from_u64(0x0102030405060708_u64)
+    }
 
     fn residue_class(len: T, m: T) -> UF<T> {
         let mut res = UF::new_reflexive(len);
@@ -286,9 +313,45 @@ mod tests {
             }
         }
     }
+    fn random_uf(size: usize, max_unions: usize, rng: &mut StdRng) -> UF<T> {
+        let tsize = T::from_usize(size).unwrap();
+        let mut res = UF::new_reflexive(tsize);
+        let num_unions = rng.gen_range(0, max_unions);
+        for _ in 0..num_unions {
+            let i = rng.gen_range(0, tsize);
+            let j = rng.gen_range(0, tsize);
+            res.union(i, j);
+        }
+        res
+    }
+    fn test_intersections(a: &UF<T>, b: &UF<T>) {
+        let c1 = UF::equivalence_intersection(a, b);
+        let c2 = UF::equivalence_intersection(a, b);
+        c1.canonicalize();
+        c2.canonicalize();
+        let res = unsafe { c1.struct_eq(&c2) };
+        if !res {
+            println!("a={:?}", a);
+            println!("b={:?}", b);
+            println!("c1={:?}", c1);
+            println!("c2={:?}", c2);
+            assert!(res);
+        }
+    }
+    #[test]
+    fn do_random_intersection_tests() {
+        let mut rng = test_rng();
+        let ntests = 1000;
+        for _ in 0..ntests {
+            let size = rng.gen_range(20, 30);
+            let a = random_uf(size, 15, &mut rng);
+            let b = random_uf(size, 15, &mut rng);
+            test_intersections(&a, &b);
+        }
+    }
     #[test]
     fn try_2_3_6() {
-        let size = 10000;
+        let size = 2000;
         println!("making x2");
         let x2 = residue_class(size, 2);
         println!("checking x2");
