@@ -1,10 +1,13 @@
 [package]
-name = "union_find"
+name = "red_union_find"
 version = "0.1.0"
 authors = ["Ken Bateman <novadenizen@gmail.com>"]
 edition = "2018"
+description = "red_union_find provides an implementation of the union find algorithm."
+license = "LGPL-3.0"
+repository = "https://github.com/NovaDenizen/red_union_find.git" 
+documentation = "https://docs.rs/red_union_find"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 num = "0.3"
