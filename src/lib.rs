@@ -7,9 +7,9 @@ use std::cell::Cell;
 /// Implements union-find
 ///
 /// The UF structure efficiently represents a disjoint set data structure.
-struct UF<I: Copy> {
+pub struct UF<I: Copy> {
     /// invariants: 
-    ///     1.  leaders[i] <= i, so whenever unioning two indices, the bigger will point to the
+    ///     1.  `leaders[i] <= i`, so whenever unioning two indices, the bigger will point to the
     ///            smaller.  This prevents (non-identity) cycles.
     leaders: Vec<Cell<I>>,
 }
@@ -30,6 +30,7 @@ where
         true
     }
 }
+
 
 impl<I> Eq for UF<I>
 where
@@ -60,6 +61,7 @@ where
     pub fn len(&self) -> usize {
         self.leaders.len()
     }
+    #[allow(dead_code)]
     fn const_find(&self, mut i: I) -> I {
         loop {
             let l = self.leaders[i.into()].get();
@@ -78,7 +80,7 @@ where
     /// # Performance
     ///
     /// If you perform `n` `find()` operations on a `UF` with length `len()`, then these operations
-    /// will take O(`n` + `len()`) operations.
+    /// will take O(`n` + `len()`) operations.  So the performance is amortized O(1).
     pub fn find(&self, i: I) -> I {
         let cell = &self.leaders[i.into()];
         let l = cell.get();
@@ -144,6 +146,7 @@ where
         }
         res
     }
+    #[allow(dead_code)]
     fn slow_equivalence_intersection(a: &Self, b: &Self) -> Self {
         // TODO: discover a better than O(n^2) algorithm for this.
         assert!(a.leaders.len() == b.leaders.len(), "Called equivalence_union on two UF of different sizes");
@@ -169,10 +172,14 @@ where
     /// # Performance
     ///
     /// I have only been able to prove that the performance is somewhere between O(`len()`) and
-    /// O(`len()`^2).
+    /// O(`len()`^2).  But it seems pretty fast.
     /// 
     /// If either `a` or `b` is mostly pure-reflexive or mostly one big equivalence set, then the
     /// performance is almost linear.
+    ///
+    /// The inner loop that steps through the cycles can't do more than O(`len()`^2) operations.
+    /// The worst case operation seems to be when there are large sets in both argument `UF`s, but
+    /// the intersection has no non-reflexive elements.
     pub fn equivalence_intersection(a: &Self, b: &Self) -> Self {
         assert!(a.leaders.len() == b.leaders.len(), "Called equivalence_union on two UF of different sizes");
         let ap = a.as_permutation();
@@ -215,6 +222,7 @@ where
     }
 
     /// Ensure all leader paths are minimal
+    #[allow(dead_code)]
     fn canonicalize(&self) {
         for idx in 0..self.leaders.len() {
             let i = I::from_usize(idx).unwrap();
@@ -246,6 +254,7 @@ where
     /// The only one I can think of is that leaders[i] <= i
     ///
     /// This is *actually* const.
+    #[allow(dead_code)]
     fn assert_invariants(&self) 
     where
         I: std::fmt::Display,
@@ -261,6 +270,7 @@ where
     /// Unsafe because reslulting UF might violate invariants
     ///
     /// This is useful for testing.
+    #[allow(dead_code)]
     unsafe fn from_slice(slice: &[I]) -> Self {
         let leaders = slice
             .iter()
@@ -276,6 +286,7 @@ where
     /// marked as such.
     ///
     /// This is **actually** const
+    #[allow(dead_code)]
     unsafe fn struct_eq(&self, other: &Self) -> bool {
         self.leaders == other.leaders
     }
@@ -305,13 +316,14 @@ mod tests {
     }
     fn assert_is_residue_class(m: T, a: &UF<T>) {
         println!("checking if UF is residue_class {}", m);
+        let mut v = Vec::with_capacity(a.len());
         for i in 0..a.max() {
-            for j in 0..a.max() {
-                let same_res = (i % m) == (j % m);
-                let same_set = a.same_set(i,j);
-                assert_eq!(same_res, same_set, "m=={} i=={} j=={} same_set=={}", m, i, j, same_set);
-            }
+            v.push(i % m);
         }
+        let b = unsafe { UF::from_slice(&v) };
+        a.canonicalize();
+        b.canonicalize();
+        assert!(unsafe { a.struct_eq(&b) });
     }
     fn random_uf(size: usize, max_unions: usize, rng: &mut StdRng) -> UF<T> {
         let tsize = T::from_usize(size).unwrap();
@@ -349,25 +361,45 @@ mod tests {
             test_intersections(&a, &b);
         }
     }
+    /// Test intersection operation with two modular residue sets
+    ///
+    /// a and b must be relatively prime
+    fn modular_residue_test(a: T, b: T, size: T) {
+        println!("making xa");
+        let xa = residue_class(size, a);
+        println!("checking xa");
+        assert_is_residue_class(a, &xa);
+        println!("making xb");
+        let xb = residue_class(size, b);
+        println!("testing xb");
+        assert_is_residue_class(b, &xb);
+        println!("slowly making yca");
+        let c = a * b;
+        {
+            println!("quickly making ycb");
+            let ycb = UF::equivalence_intersection(&xa, &xb);
+            println!("testing ycb");
+            assert_is_residue_class(c, &ycb);
+        }
+        {
+            // same test, diffferent order arguments to the intersection call
+            println!("quickly making ycc");
+            let ycb = UF::equivalence_intersection(&xb, &xa);
+            println!("testing ycb");
+            assert_is_residue_class(c, &ycb);
+        }
+
+    }
+
     #[test]
-    fn try_2_3_6() {
-        let size = 2000;
-        println!("making x2");
-        let x2 = residue_class(size, 2);
-        println!("checking x2");
-        assert_is_residue_class(2, &x2);
-        println!("making x3");
-        let x3 = residue_class(size, 3);
-        println!("testing x3");
-        assert_is_residue_class(3, &x3);
-        println!("slowly making y6a");
-        let y6a = UF::slow_equivalence_intersection(&x2, &x3);
-        println!("testing y6a");
-        assert_is_residue_class(6, &y6a);
-        println!("quickly making y6b");
-        let y6b = UF::equivalence_intersection(&x2, &x3);
-        println!("testing y6b");
-        assert_is_residue_class(6, &y6b);
+    fn lots_of_residue_tests() {
+        const PRIMES: [T; 10] = 
+            [2, 3, 5, 7, 11, 13, 17, 19, 23, 29];
+        for i in 0..PRIMES.len()-1 {
+            for j in i+1..PRIMES.len() {
+                modular_residue_test(PRIMES[i], PRIMES[j], PRIMES[i]*PRIMES[j]*4);
+            }
+        }
     }
 
 
