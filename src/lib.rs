@@ -416,9 +416,9 @@ mod tests {
     #[test]
     fn do_random_intersection_tests() {
         let mut rng = test_rng();
-        let ntests = 1000;
+        let ntests = 10000;
         for _ in 0..ntests {
-            let size = rng.gen_range(20, 30);
+            let size = rng.gen_range(10, 30);
             let a = random_uf(size, 15, &mut rng);
             do_iterator_test(&a);
             let b = random_uf(size, 15, &mut rng);
