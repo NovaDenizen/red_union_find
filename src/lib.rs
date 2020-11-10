@@ -370,17 +370,35 @@ mod tests {
         res
     }
     fn test_intersections(a: &UF<T>, b: &UF<T>) {
-        let c1 = UF::equivalence_intersection(a, b);
-        let c2 = UF::equivalence_intersection(a, b);
+        let c1 = UF::slow_equivalence_intersection(a, b);
         c1.canonicalize();
-        c2.canonicalize();
-        let res = unsafe { c1.struct_eq(&c2) };
-        if !res {
-            println!("a={:?}", a);
-            println!("b={:?}", b);
-            println!("c1={:?}", c1);
-            println!("c2={:?}", c2);
-            assert!(res);
+        {
+            let c2 = UF::equivalence_intersection(a, b);
+            c2.canonicalize();
+            let res = unsafe { c1.struct_eq(&c2) };
+            if !res {
+                println!("a={:?}", a);
+                println!("b={:?}", b);
+                println!("c1={:?}", c1);
+                println!("c2={:?}", c2);
+                assert!(res);
+            }
+        }
+        {
+            let t = a;
+            let a = b;
+            let b = t;
+            // same as before, but different order args
+            let c2 = UF::slow_equivalence_intersection(a, b);
+            c2.canonicalize();
+            let res = unsafe { c1.struct_eq(&c2) };
+            if !res {
+                println!("a={:?}", a);
+                println!("b={:?}", b);
+                println!("c1={:?}", c1);
+                println!("c2={:?}", c2);
+                assert!(res);
+            }
         }
     }
     #[test]
