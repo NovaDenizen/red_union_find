@@ -330,7 +330,7 @@ where
 mod tests {
     type T = u16;
     use super::UF;
-    use FromPrimitive;
+    use num_traits::FromPrimitive;
     use rand::prelude::*;
 
     fn test_rng() -> StdRng {
@@ -398,6 +398,7 @@ mod tests {
     ///
     /// a and b must be relatively prime
     fn modular_residue_test(a: T, b: T, size: T) {
+        use num_integer::Integer;
         println!("making xa");
         let xa = residue_class(size, a);
         println!("checking xa");
@@ -408,6 +409,7 @@ mod tests {
         assert_is_residue_class(b, &xb);
         println!("slowly making yca");
         let c = a * b;
+        assert_eq!(a.gcd(&b), 1, "a and b are not relatively prime");
         {
             println!("quickly making ycb");
             let ycb = UF::equivalence_intersection(&xa, &xb);
