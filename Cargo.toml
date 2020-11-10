@@ -1,6 +1,6 @@
 [package]
 name = "red_union_find"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Ken Bateman <novadenizen@gmail.com>"]
 edition = "2018"
 description = "red_union_find provides an implementation of the union find algorithm."

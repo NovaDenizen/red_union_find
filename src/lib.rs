@@ -310,7 +310,7 @@ where
     type Item = I;
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            if self.next_i > self.uf.max() {
+            if self.next_i >= self.uf.max() {
                 return None;
             }
             let i = self.next_i;
@@ -401,6 +401,18 @@ mod tests {
             }
         }
     }
+    fn do_iterator_test(a: &UF<T>) {
+        use std::collections::BTreeSet;
+        let mut s = BTreeSet::new();
+        for i in 0..a.max() {
+            if a.find(i) == i {
+                s.insert(i);
+            }
+        }
+        let comp: Vec<T> = s.into_iter().collect();
+        let leaders: Vec<T> = a.leaders().collect();
+        assert_eq!(comp, leaders, "iterator test failed for {:?}", a);
+    }
     #[test]
     fn do_random_intersection_tests() {
         let mut rng = test_rng();
@@ -408,7 +420,9 @@ mod tests {
         for _ in 0..ntests {
             let size = rng.gen_range(20, 30);
             let a = random_uf(size, 15, &mut rng);
+            do_iterator_test(&a);
             let b = random_uf(size, 15, &mut rng);
+            do_iterator_test(&b);
             test_intersections(&a, &b);
         }
     }
