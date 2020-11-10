@@ -1,6 +1,7 @@
 
 //! A basic implementation of the Union-find algorithm
-use num;
+use num_traits:: { FromPrimitive, Num };
+use num_integer::Integer;
 use std::cell::Cell;
 
 #[derive(Clone, Debug)]
@@ -16,7 +17,7 @@ pub struct UF<I: Copy> {
 
 impl<I> PartialEq for UF<I>
 where
-    I: Into<usize> + Copy + num::FromPrimitive + num::Num + num::Integer,
+    I: Into<usize> + Copy + FromPrimitive + Num + Integer,
 {
     fn eq(&self, other: &Self) -> bool {
         assert!(self.leaders.len() == other.leaders.len(), 
@@ -34,14 +35,14 @@ where
 
 impl<I> Eq for UF<I>
 where
-    I: Into<usize> + Copy + num::FromPrimitive + num::Num + num::Integer,
+    I: Into<usize> + Copy + FromPrimitive + Num + Integer,
 {
 }
 
 
 impl<I> UF<I>
 where
-    I: Into<usize> + Copy + num::FromPrimitive + num::Num + num::Integer,
+    I: Into<usize> + Copy + FromPrimitive + Num + Integer,
 {
     /// Creates a minimal reflexive UF structure.
     ///
@@ -290,14 +291,46 @@ where
     unsafe fn struct_eq(&self, other: &Self) -> bool {
         self.leaders == other.leaders
     }
+
+    /// Returns an iterator over group leader indexes
+    pub fn leaders<'a>(&'a self) -> LeadersIter<'a, I> {
+        LeadersIter { uf: self, next_i: I::zero() }
+    }
 }
+
+pub struct LeadersIter<'a, I: Copy> {
+    uf: &'a UF<I>,
+    next_i: I,
+}
+
+impl<'a, I: Copy> Iterator for LeadersIter<'a,I>
+where
+    I: Into<usize> + Copy + FromPrimitive + Num + Integer,
+{
+    type Item = I;
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if self.next_i > self.uf.max() {
+                return None;
+            }
+            let i = self.next_i;
+            let l = self.uf.find(i);
+            self.next_i = self.next_i + I::one();
+            if i == l {
+                return Some(i);
+            }
+        }
+    }
+}
+
+
 
 
 #[cfg(test)]
 mod tests {
     type T = u16;
     use super::UF;
-    use num::FromPrimitive;
+    use FromPrimitive;
     use rand::prelude::*;
 
     fn test_rng() -> StdRng {
@@ -428,3 +461,4 @@ mod tests {
         }
     }
 }
+
