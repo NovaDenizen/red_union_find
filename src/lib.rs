@@ -146,8 +146,8 @@ where
     }
     /// Creates a new UF that represents the union of the two given equivalence relations.
     ///
-    /// let `c = UF::equivalence_union(&a, &b)`.  Then `c.same_set(i,j) == a.same_set(i,j) ||
-    /// b.same_set(i,j)`.
+    /// let `c = UF::equivalence_union(&a, &b)`.  Then for all `i` and `j`, `c.same_set(i,j) ==
+    /// a.same_set(i,j) || b.same_set(i,j)`.
     ///
     /// # Performance
     ///
@@ -181,8 +181,8 @@ where
     }
     /// Creates a new UF that represents the intersection of the two given equivalence relations.
     ///
-    /// let `c = UF::equivalence_intersection(&a, &b)`.  `c.same_set(i,j) == a.same_set(i,j) &&
-    /// b.same_set(i,j)`.
+    /// let `c = UF::equivalence_intersection(&a, &b)`.  Then for all `i` and `j`, `c.same_set(i,j)
+    /// == a.same_set(i,j) && b.same_set(i,j)`.
     ///
     /// # Performance
     ///
