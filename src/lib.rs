@@ -8,6 +8,9 @@ use std::cell::Cell;
 /// Implements union-find
 ///
 /// The UF structure efficiently represents a disjoint set data structure.
+///
+/// The standard rust unsigned primitive types (`u8`, `u16`, `u32`, `u64`, `u128`, and `usize`)
+/// make fine index types.  You probably should use the smallest type that meets your needs.
 pub struct UF<I: Copy> {
     /// invariants: 
     ///     1.  `leaders[i] <= i`, so whenever unioning two indices, the bigger will point to the
@@ -76,12 +79,15 @@ where
     ///
     /// This method purports to immutably use `&self`, but it really uses interior mutability to
     /// implement path-compression in the safe, traditional way.  Almost every other method on `UF`
-    /// delegates to `find`, so they are all lying too.
+    /// delegates to `find`, so they are all lying too.  The data structure may be physically
+    /// changing, doing path compression, but these changes don't logically change the outcome of
+    /// any API calls.
     ///
     /// # Performance
     ///
     /// If you perform `n` `find()` operations on a `UF` with length `len()`, then these operations
     /// will take O(`n` + `len()`) operations.  So the performance is amortized O(1).
+    /// 
     pub fn find(&self, i: I) -> I {
         let cell = &self.leaders[i.into()];
         let l = cell.get();
@@ -104,6 +110,7 @@ where
             let res = this;
             this = prev;
             while this != i {
+                // follow the bread crumb trail back to i, doing path compression along the way
                 let next = self.leaders[this.into()].replace(res);
                 this = next;
             }
@@ -117,6 +124,10 @@ where
     /// Since `UF` uses interior mutability, the `mut` attribute here is not strictly necessary.
     /// But it communicates to the user that the data structure is logically changing, so it's a
     /// worthwhiile part of the API.
+    ///
+    /// # Performance
+    ///
+    /// Each call to `union` performs two `find()` calls and does O(1) work.
     pub fn union(&mut self, i: I, j: I) {
         // The mutability here is really not necessary, but I think it is effective at
         // astonishment reduction.
@@ -125,6 +136,7 @@ where
         if l_i < l_j {
             self.leaders[l_j.into()].set(l_i);
         } else {
+            // if l_i == l_j this is fine too
             self.leaders[l_i.into()].set(l_j);
         }
     }
@@ -134,10 +146,12 @@ where
     }
     /// Creates a new UF that represents the union of the two given equivalence relations.
     ///
-    /// let `c = UF::equivalence_union(&a, &b)`.  `c.same_set(i,j) == a.same_set(i,j) ||
+    /// let `c = UF::equivalence_union(&a, &b)`.  Then `c.same_set(i,j) == a.same_set(i,j) ||
     /// b.same_set(i,j)`.
     ///
-    /// Performance: O(len())
+    /// # Performance
+    ///
+    /// O(len())
     pub fn equivalence_union(a: &Self, b: &Self) -> Self {
         assert!(a.leaders.len() == b.leaders.len(), "Called equivalence_union on two UF of different sizes");
         let mut res = a.clone();
@@ -178,11 +192,18 @@ where
     /// If either `a` or `b` is mostly pure-reflexive or mostly one big equivalence set, then the
     /// performance is almost linear.
     ///
-    /// The inner loop that steps through the cycles can't do more than O(`len()`^2) operations.
+    /// Creating the result can't be done in less than O(`len()`) performace.  The inner loop that
+    /// steps through the cycles can't do more than O(`len()`^2) operations since it won't compare
+    /// the same two elements twice.
+    ///
     /// The worst case operation seems to be when there are large sets in both argument `UF`s, but
-    /// the intersection has no non-reflexive elements.
+    /// the intersection has no non-reflexive elements.  Imagine two UF's representing the
+    /// equivalence classes of two prime modular fields, based on primes p1 and p2.  Then for large
+    /// `len()` (larger than `p1*p2`), this operation will take about O(`len()*(p1+p2)`) operations.
     pub fn equivalence_intersection(a: &Self, b: &Self) -> Self {
         assert!(a.leaders.len() == b.leaders.len(), "Called equivalence_union on two UF of different sizes");
+        /// These permutatons have each equivalence set as a cycle.  Every link in the cycle points
+        /// downward except for the smallest which points upward at the maximal element of the cycle.
         let ap = a.as_permutation();
         let bp = b.as_permutation();
         let mut c = UF::new_reflexive(a.max());
@@ -216,6 +237,7 @@ where
             }
             if anext == bnext {
                 // anext is the biggest element in both the a and b cycle.
+                // So a.same_set(i,anext) and b.same_set(i,anext)
                 c.union(I::from_usize(i).unwrap(), I::from_usize(anext).unwrap());
             }
         }
