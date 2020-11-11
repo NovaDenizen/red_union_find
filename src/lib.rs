@@ -202,8 +202,8 @@ where
     /// `len()` (larger than `p1*p2`), this operation will take about O(`len()*(p1+p2)`) operations.
     pub fn equivalence_intersection(a: &Self, b: &Self) -> Self {
         assert!(a.leaders.len() == b.leaders.len(), "Called equivalence_union on two UF of different sizes");
-        /// These permutatons have each equivalence set as a cycle.  Every link in the cycle points
-        /// downward except for the smallest which points upward at the maximal element of the cycle.
+        // These permutatons have each equivalence set as a cycle.  Every link in the cycle points
+        // downward except for the smallest which points upward at the maximal element of the cycle.
         let ap = a.as_permutation();
         let bp = b.as_permutation();
         let mut c = UF::new_reflexive(a.max());
