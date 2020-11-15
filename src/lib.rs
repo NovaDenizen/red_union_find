@@ -11,6 +11,11 @@ use std::cell::Cell;
 ///
 /// The standard rust unsigned primitive types (`u8`, `u16`, `u32`, `u64`, `u128`, and `usize`)
 /// make fine index types.  You probably should use the smallest type that meets your needs.
+///
+/// UF can be viewed in a lattice.  UF::new_reflexive() is the global infimum, and the result of
+/// joining all elements with all other elements into one big equiovalence set is the global
+/// supremum.  `equivalence_intersection()` is the lattice gcd, and `equivalence_union()` is the
+/// lattice lcm.
 pub struct UF<I: Copy> {
     /// invariants: 
     ///     1.  `leaders[i] <= i`, so whenever unioning two indices, the bigger will point to the
@@ -137,7 +142,7 @@ where
             self.leaders[l_j.into()].set(l_i);
         } else {
             // if l_i == l_j this is fine too
-            self.leaders[l_i.into()].set(l_j);
+            self.leaders[l_i.into()].set(l_j);Z
         }
     }
     /// Retrns true if `i` and `j` are in the same equivalence set.
@@ -148,6 +153,8 @@ where
     ///
     /// let `c = UF::equivalence_union(&a, &b)`.  Then for all `i` and `j`, `c.same_set(i,j) ==
     /// a.same_set(i,j) || b.same_set(i,j)`.
+    ///
+    /// This operation is the lattice infimum over `UF`.
     ///
     /// # Performance
     ///
@@ -184,13 +191,22 @@ where
     /// let `c = UF::equivalence_intersection(&a, &b)`.  Then for all `i` and `j`, `c.same_set(i,j)
     /// == a.same_set(i,j) && b.same_set(i,j)`.
     ///
+    /// This operation is the lattice supremum over `UF`.
+    ///
+    /// You could also say this function returns the maximal mutual common ancestor of its
+    /// arguments.  No sequence of `union()` operations will transform `a` or `b` into `c`, there
+    /// are sequences of `union()` operations that will transform `c` into either `a` or `b`, and a
+    /// minimal sequence of `union()` operations for transforming `c` to `a` will have no entries
+    /// in common with a minimal sequence from `c` to `b`.
+    ///
     /// # Performance
     ///
     /// I have only been able to prove that the performance is somewhere between O(`len()`) and
     /// O(`len()`^2).  But it seems pretty fast.
     /// 
-    /// If either `a` or `b` is mostly pure-reflexive or mostly one big equivalence set, then the
-    /// performance is almost linear.
+    /// If either `a` or `b` is mostly pure-reflexive or mostly one big equivalence set, or if `a`
+    /// and `b` are very similar (each of them are a short number of unions away from their common
+    /// ancestor), then the performance is almost linear.
     ///
     /// Creating the result can't be done in less than O(`len()`) performace.  The inner loop that
     /// steps through the cycles can't do more than O(`len()`^2) operations since it won't compare
