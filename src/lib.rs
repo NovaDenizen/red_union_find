@@ -96,9 +96,8 @@ where
     pub fn find(&self, i: I) -> I {
         let cell = &self.leaders[i.into()];
         let l = cell.get();
-        // TODO: optimize for common case
-        if l == i {
-            i
+        if i == l || self.leaders[l.into()].get() == l {
+            l
         } else {
             let mut prev = i;
             let mut this = l;
@@ -142,7 +141,7 @@ where
             self.leaders[l_j.into()].set(l_i);
         } else {
             // if l_i == l_j this is fine too
-            self.leaders[l_i.into()].set(l_j);Z
+            self.leaders[l_i.into()].set(l_j);
         }
     }
     /// Retrns true if `i` and `j` are in the same equivalence set.
