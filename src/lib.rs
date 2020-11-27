@@ -21,6 +21,9 @@ pub struct UF<I: Copy> {
     ///     1.  `leaders[i] <= i`, so whenever unioning two indices, the bigger will point to the
     ///            smaller.  This prevents (non-identity) cycles.
     leaders: Vec<Cell<I>>,
+    /// All indices < min_uncanonical are canonical, that is they point directly at their group
+    /// leader
+    min_uncanonical: Cell<I>,
 }
 
 impl<I> PartialEq for UF<I>
@@ -60,7 +63,7 @@ where
         for i in 0..size.into() {
             leaders.push(Cell::new(I::from_usize(i).unwrap()))
         }
-        UF { leaders }
+        UF { leaders, min_uncanonical: Cell::new(size) }
     }
     /// Returns the element beyond the largest represented in ths `UF`.
     pub fn max(&self) -> I {
@@ -94,6 +97,9 @@ where
     /// will take O(`n` + `len()`) operations.  So the performance is amortized O(1).
     /// 
     pub fn find(&self, i: I) -> I {
+        if i < self.min_uncanonical.get() {
+            return self.leaders[i.into()].get();
+        }
         let cell = &self.leaders[i.into()];
         let l = cell.get();
         if i == l || self.leaders[l.into()].get() == l {
@@ -101,10 +107,11 @@ where
         } else {
             let mut prev = i;
             let mut this = l;
+            // Look for the leader, leaving a bread crumb trail pointing back to where we started
             loop {
                 let next = self.leaders[this.into()].get();
                 if this == next {
-                    break;
+                    break; // we have found the leader
                 }
                 // leave a bread crumb
                 self.leaders[this.into()].set(prev);
@@ -131,7 +138,7 @@ where
     ///
     /// # Performance
     ///
-    /// Each call to `union` performs two `find()` calls and does O(1) work.
+    /// Each call to `union` performs two `find()` calls and additionally does O(1) work.
     pub fn union(&mut self, i: I, j: I) {
         // The mutability here is really not necessary, but I think it is effective at
         // astonishment reduction.
@@ -139,10 +146,13 @@ where
         let l_j = self.find(j);
         if l_i < l_j {
             self.leaders[l_j.into()].set(l_i);
-        } else {
-            // if l_i == l_j this is fine too
+            self.min_uncanonical.set(self.min_uncanonical.get().min(l_j));
+        } else if l_j < l_i {
             self.leaders[l_i.into()].set(l_j);
+            self.min_uncanonical.set(self.min_uncanonical.get().min(l_i));
         }
+        // else l_i == l_j, no action
+
     }
     /// Retrns true if `i` and `j` are in the same equivalence set.
     pub fn same_set(&self, i: I, j: I) -> bool {
@@ -163,9 +173,14 @@ where
         let mut res = a.clone();
         for idx in 0..b.leaders.len() {
             let i = I::from_usize(idx).unwrap();
-            res.union(i, b.find(i))
+            res.union(i, b.find(i));
         }
+        b.mark_canonical(); // we have gone over all of b's entries with find()
         res
+    }
+    /// Mark this object as being canonical
+    fn mark_canonical(&self) {
+        self.min_uncanonical.set(self.max());
     }
     #[allow(dead_code)]
     fn slow_equivalence_intersection(a: &Self, b: &Self) -> Self {
@@ -266,6 +281,7 @@ where
             let i = I::from_usize(idx).unwrap();
             self.find(i);
         }
+        self.mark_canonical();
     }
     /// Creates permutation version of a UF
     ///
@@ -285,6 +301,8 @@ where
                 res[j.into()] = i;       // leader now points at this one, the new max
             }
         }
+        // since we have called find() on every element, we get this for free
+        self.mark_canonical();
         res
     }
     /// Ensures all expected invariants hold
@@ -295,11 +313,17 @@ where
     #[allow(dead_code)]
     fn assert_invariants(&self) 
     where
-        I: std::fmt::Display,
+        I: std::fmt::Display + std::fmt::Debug,
     {
         for idx in 0..self.leaders.len() {
             let v = self.leaders[idx].get().into();
             assert!(v <= idx, "leaders[{}] == {}, expected it to be <= {}", idx, v, idx);
+        }
+        for idx in 0..self.min_uncanonical.get().into() {
+            assert_eq!(self.leaders[idx].get(), self.const_find(I::from_usize(idx).unwrap()),
+                       "index {} is less than {}, but isn't canonical",
+                       idx, self.min_uncanonical.get());
+
         }
     }
 
@@ -315,7 +339,7 @@ where
             .cloned()
             .map(|v| Cell::new(v))
             .collect();
-        UF { leaders }
+        UF { leaders, min_uncanonical: Cell::new(I::zero()) }
     }
 
     /// compare two UF for structual equality, not logical equality
@@ -326,7 +350,7 @@ where
     /// This is **actually** const
     #[allow(dead_code)]
     unsafe fn struct_eq(&self, other: &Self) -> bool {
-        self.leaders == other.leaders
+        self.leaders == other.leaders && self.min_uncanonical == other.min_uncanonical
     }
 
     /// Returns an iterator over group leader indexes
