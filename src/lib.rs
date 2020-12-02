@@ -1,7 +1,7 @@
 
 //! A basic implementation of the Union-find algorithm
-use num_traits:: { FromPrimitive, Num };
-use num_integer::Integer;
+use num_traits::FromPrimitive;
+
 use std::cell::Cell;
 
 #[derive(Clone, Debug)]
@@ -28,7 +28,7 @@ pub struct UF<I: Copy> {
 
 impl<I> PartialEq for UF<I>
 where
-    I: Into<usize> + Copy + FromPrimitive,
+    I: Into<usize> + Copy + FromPrimitive + PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         assert!(self.leaders.len() == other.leaders.len(), 
@@ -46,7 +46,7 @@ where
 
 impl<I> Eq for UF<I>
 where
-    I: Into<usize> + Copy + FromPrimitive + Num + Integer,
+    I: Into<usize> + Copy + FromPrimitive + Eq,
 {
 }
 

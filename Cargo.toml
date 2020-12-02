@@ -11,7 +11,6 @@ documentation = "https://docs.rs/red_union_find"
 
 [dependencies]
 num-traits = "0.2"
-num-integer = "0.1"
 
 [dev-dependencies]
 rand = "0.7"
