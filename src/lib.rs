@@ -28,14 +28,14 @@ pub struct UF<I: Copy> {
 
 impl<I> PartialEq for UF<I>
 where
-    I: Into<usize> + Copy + FromPrimitive + Num + Integer,
+    I: Into<usize> + Copy + FromPrimitive,
 {
     fn eq(&self, other: &Self) -> bool {
         assert!(self.leaders.len() == other.leaders.len(), 
                 "Tried to compare equality on two UF with different sizes");
         for i_idx in 0..self.leaders.len() {
             let i = I::from_usize(i_idx).unwrap();
-            if self.find(i) != other.find(i) {
+            if self.find(i).into() != other.find(i).into() {
                 return false;
             }
         }
@@ -53,7 +53,7 @@ where
 
 impl<I> UF<I>
 where
-    I: Into<usize> + Copy + FromPrimitive + Num + Integer,
+    I: Into<usize> + Copy + FromPrimitive,
 {
     /// Creates a minimal reflexive UF structure.
     ///
@@ -77,7 +77,7 @@ where
     fn const_find(&self, mut i: I) -> I {
         loop {
             let l = self.leaders[i.into()].get();
-            if l == i {
+            if l.into() == i.into() {
                 return l
             }
             i = l;
@@ -97,12 +97,12 @@ where
     /// will take O(`n` + `len()`) operations.  So the performance is amortized O(1).
     /// 
     pub fn find(&self, i: I) -> I {
-        if i < self.min_uncanonical.get() {
+        if i.into() < self.min_uncanonical.get().into() {
             return self.leaders[i.into()].get();
         }
         let cell = &self.leaders[i.into()];
         let l = cell.get();
-        if i == l || self.leaders[l.into()].get() == l {
+        if i.into() == l.into() || self.leaders[l.into()].get().into() == l.into() {
             l
         } else {
             let mut prev = i;
@@ -110,7 +110,7 @@ where
             // Look for the leader, leaving a bread crumb trail pointing back to where we started
             loop {
                 let next = self.leaders[this.into()].get();
-                if this == next {
+                if this.into() == next.into() {
                     break; // we have found the leader
                 }
                 // leave a bread crumb
@@ -120,7 +120,7 @@ where
             }
             let res = this;
             this = prev;
-            while this != i {
+            while this.into() != i.into() {
                 // follow the bread crumb trail back to i, doing path compression along the way
                 let next = self.leaders[this.into()].replace(res);
                 this = next;
@@ -144,19 +144,23 @@ where
         // astonishment reduction.
         let l_i = self.find(i);
         let l_j = self.find(j);
-        if l_i < l_j {
+        if l_i.into() < l_j.into() {
             self.leaders[l_j.into()].set(l_i);
-            self.min_uncanonical.set(self.min_uncanonical.get().min(l_j));
-        } else if l_j < l_i {
+            self.bump_min_uncanonical(l_j)
+        } else if l_j.into() < l_i.into() {
             self.leaders[l_i.into()].set(l_j);
-            self.min_uncanonical.set(self.min_uncanonical.get().min(l_i));
+            self.bump_min_uncanonical(l_j)
         }
         // else l_i == l_j, no action
-
+    }
+    fn bump_min_uncanonical(&mut self, i: I) {
+        if i.into() < self.min_uncanonical.get().into() {
+            self.min_uncanonical.set(I::from_usize(i.into()).unwrap());
+        }
     }
     /// Retrns true if `i` and `j` are in the same equivalence set.
     pub fn same_set(&self, i: I, j: I) -> bool {
-        self.find(i) == self.find(j)
+        self.find(i).into() == self.find(j).into()
     }
     /// Creates a new UF that represents the union of the two given equivalence relations.
     ///
@@ -294,7 +298,7 @@ where
         for idx in 0..self.len() {
             let i = I::from_usize(idx).unwrap();
             let j = self.find(i);
-            if i == j {
+            if i.into() == j.into() {
                 res.push(j); // identity cycle
             } else { // points to the leader
                 res.push(res[j.into()]); // This cell points back at the previous max
@@ -320,7 +324,8 @@ where
             assert!(v <= idx, "leaders[{}] == {}, expected it to be <= {}", idx, v, idx);
         }
         for idx in 0..self.min_uncanonical.get().into() {
-            assert_eq!(self.leaders[idx].get(), self.const_find(I::from_usize(idx).unwrap()),
+            assert_eq!(self.leaders[idx].get().into(), 
+                       idx,
                        "index {} is less than {}, but isn't canonical",
                        idx, self.min_uncanonical.get());
 
@@ -339,7 +344,7 @@ where
             .cloned()
             .map(|v| Cell::new(v))
             .collect();
-        UF { leaders, min_uncanonical: Cell::new(I::zero()) }
+        UF { leaders, min_uncanonical: Cell::new(I::from_usize(0).unwrap()) }
     }
 
     /// compare two UF for structual equality, not logical equality
@@ -350,12 +355,20 @@ where
     /// This is **actually** const
     #[allow(dead_code)]
     unsafe fn struct_eq(&self, other: &Self) -> bool {
-        self.leaders == other.leaders && self.min_uncanonical == other.min_uncanonical
+        if self.leaders.len() != other.leaders.len() {
+            return false;
+        }
+        for i in 0..self.leaders.len() {
+            if self.leaders[i].get().into() != other.leaders[i].get().into() {
+                return false;
+            }
+        }
+        self.min_uncanonical.get().into() == other.min_uncanonical.get().into()
     }
 
     /// Returns an iterator over group leader indexes
     pub fn leaders<'a>(&'a self) -> LeadersIter<'a, I> {
-        LeadersIter { uf: self, next_i: I::zero() }
+        LeadersIter { uf: self, next_i: I::from_usize(0).unwrap() }
     }
 }
 
@@ -366,18 +379,18 @@ pub struct LeadersIter<'a, I: Copy> {
 
 impl<'a, I: Copy> Iterator for LeadersIter<'a,I>
 where
-    I: Into<usize> + Copy + FromPrimitive + Num + Integer,
+    I: Into<usize> + Copy + FromPrimitive,
 {
     type Item = I;
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            if self.next_i >= self.uf.max() {
+            let i = self.next_i;
+            if i.into() >= self.uf.len() {
                 return None;
             }
-            let i = self.next_i;
             let l = self.uf.find(i);
-            self.next_i = self.next_i + I::one();
-            if i == l {
+            self.next_i = I::from_usize(i.into() + 1).unwrap();
+            if i.into() == l.into() {
                 return Some(i);
             }
         }
